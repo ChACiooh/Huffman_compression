@@ -1,4 +1,5 @@
 #include "DS.h"
+#include <iostream>
 
 /// Hash
 void Hash::PushLetter(char letter)
@@ -48,55 +49,51 @@ Data* Hash::GetData(int idx) const
 }
 
 /// Huffman
-Huffman::Huffman(const Huffman& new_hf)
-{
-	stemL = new_hf.stemL;
-	stemR = new_hf.stemR;
-	num = new_hf.num;
-}
 Huffman::~Huffman()
 {
-	free_tree();
 	num = 0;
 }
-
-void Huffman::free_tree()
+/*
+void Huffman::free_tree() // 알아서 call destructor recursively
 {
 	if(stemL) {
-		stemL->free_tree();
+		try { delete(stemL); }
+		catch (std::exception e) {}
 	}
-	free(stemL);
 	if(stemR) {
-		stemR->free_tree();
+		try { delete(stemR); }
+		catch (std::exception e) {}
 	}
-	free(stemR);
-}
+}*/
 
 /// min_heap
 min_heap::min_heap(int _size_) : size_(_size_)
 {
-	data_ = new Huffman[_size_+1]; // numbering from 1
-	for(int i=0;i<=_size_;i++){
-		data_[i] = Huffman();
-	}
+	data_ = (Huffman**)calloc(sizeof(Huffman*), _size_+1);
+	alloc_ = size_;
 }
 
 min_heap::~min_heap()
 {
-	free(data_);
+	delete[](data_);
 }
 
 void min_heap::resize(int _size_)
 {
-	Huffman *new_data = NULL;
+	Huffman **new_data = NULL;
 	if(_size_ == alloc_)	return;
 	else
 	{
-		new_data = new Huffman[_size_+1];
+		new_data = new Huffman*[_size_+1];
+		for (int i = 0; i <= _size_; i++)
+		{
+			new_data[i] = new Huffman();
+		}
 		// numbering from 1
 		if(_size_ < size_)
 		{
 			for(int i=1;i<=_size_;i++)	new_data[i] = data_[i];
+			for (int i = _size_; i <= size_; i++)	delete(data_[i]);
 			size_ = _size_; // 줄어들었으므로.
 		}
 		else if(_size_ > alloc_)
@@ -104,61 +101,63 @@ void min_heap::resize(int _size_)
 			for(int i=1;i<=size_;i++)	new_data[i] = data_[i];
 			alloc_ = _size_;
 		}
-		free(data_);
 		data_ = new_data;
 	}
 }
 
-Huffman min_heap::operator[](int idx) const
+void min_heap::Insert(Huffman* hf)
+{
+	if (size_ == alloc_){
+		resize(size_ + 1);
+	}
+	data_[++size_] = hf;
+	int child = size_;
+	int parent = child / 2;
+	while (child > 1)
+	{
+		if (data_[parent]->num > data_[child]->num)
+		{
+			Huffman* temp = data_[parent];
+			data_[parent] = data_[child];
+			data_[child] = temp;
+		}
+		else   break;
+	}
+}
+
+Huffman* min_heap::pop()
+{
+	if (empty())	return NULL;
+	Huffman *return_val = data_[1];
+	Huffman *temp = data_[size_];
+	data_[size_] = data_[1];
+	data_[1] = temp;
+	data_[size_--] = NULL;
+	int parent = 1, child = 2;
+
+	while (child <= size_)
+	{
+		if (child < size_ && data_[child]->num > data_[child + 1]->num)	++child;
+		if (data_[parent]->num > data_[child]->num)
+		{
+			temp = data_[parent];
+			data_[parent] = data_[child];
+			data_[child] = temp;
+			parent = child;
+			child = parent * 2;
+		}
+		else    break;
+	}
+
+	return return_val;
+}
+
+Huffman* min_heap::operator[](int idx)
 {
 	return data_[idx];
 }
 
-void min_heap::Insert(Huffman hf)
+bool min_heap::empty() const
 {
-	if(size_ == alloc_)	resize(size_+1);
-	data_[++size_] = hf;
-	int parent, child;
-	Huffman temp;
-
-	child = size_;
-	parent = child/2;
-	// shift up
-	while(child > 1)
-	{
-		if(data_[parent].num > data_[child].num)
-		{
-			temp = data_[child];
-			data_[child] = data_[parent];
-			data_[parent] = temp;
-			child = parent;
-			parent = child/2;
-		}
-		else	break;
-	}
-}
-
-Huffman min_heap::pop()
-{
-	int parent = 1, child = 2;
-	Huffman temp = data_[parent];
-	data_[parent] = data_[size_];
-	data_[size_--] = temp;
-	// returning hf is in size_+1
-
-	// shift down
-	while(child <= size_)
-	{
-		if(data_[child].num > data_[child+1].num)	++child;
-		if(data_[parent].num > data_[child].num)
-		{
-			temp = data_[child];
-			data_[child] = data_[parent];
-			data_[parent] = temp;
-			parent = child;
-			child = parent * 2;
-		}
-		else	break;
-	}
-	return data_[size_+1];
+	return size_ == 0;
 }

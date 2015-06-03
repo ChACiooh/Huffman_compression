@@ -11,7 +11,7 @@
 
 struct Data
 {
-	Data() {}
+	Data() { letter = freq = 0; }
 	Data(char a, int b)
 	{
 		letter = a;
@@ -21,19 +21,17 @@ struct Data
 	// data area
 	char letter;
 	int freq; // frequency
-	Data *left, *right;
 };
 
 struct Huffman
 {
 	Huffman() { stemL = stemR = NULL; num = 0; }
-	Huffman(const Huffman&);
+	Huffman(Data new_datum) { stemL = stemR = NULL; datum = new_datum; num = new_datum.freq; }
 	~Huffman();
-	void free_tree();
-	void link(Data*);
+	//void free_tree();
 
 	// data area
-	Data left, right;
+	Data datum;
 	Huffman *stemL, *stemR;
 	int num;
 };
@@ -41,19 +39,20 @@ struct Huffman
 class min_heap
 {
 public:
-	min_heap() { data_ = NULL; }
+	min_heap() { data_ = NULL; alloc_ = size_ = 0; }
 	min_heap(int _size_);
 	~min_heap();
 
 	const int& size() const { return size_; }
 	void resize(int _size_);
-	void Insert(Huffman);
-	Huffman pop();
-	Huffman operator[](int) const; // get only, cannot edit
+	void Insert(Huffman*);
+	bool empty() const;
+	Huffman* pop();
+	Huffman* operator[](int);
 private:
 	int alloc_; // the number of storages
 	int size_; // the number of items
-	Huffman* data_; // array which has Huffman structures.
+	Huffman** data_; // array which has Huffman structures.
 };
 
 class Hash
