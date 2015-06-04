@@ -9,6 +9,33 @@
 #define SPEC_LETTERS	3 // ',', '.', ' '
 #define HASH_SIZE	(26*2+SPEC_LETTERS)
 
+/// 연결리스트
+struct List
+{
+	List(char new_letter) : letter(new_letter)
+	{
+		next = NULL;
+	}
+	char letter;
+	List *next;
+};
+
+struct LinkedList
+{
+	LinkedList()
+	{
+		size = 0;
+		root = NULL;
+	}
+	~LinkedList();
+
+	void push_back(char);
+	char operator [](int idx);
+	int size;
+	List *root;
+};
+
+/// 기본적인 노드
 struct Data
 {
 	Data() { letter = freq = 0; }
@@ -23,6 +50,8 @@ struct Data
 	int freq; // frequency
 };
 
+
+/// 허프만 노드
 struct Huffman
 {
 	Huffman() { stemL = stemR = NULL; num = 0; }
@@ -36,6 +65,7 @@ struct Huffman
 	int num;
 };
 
+/// priority_queue
 class min_heap
 {
 public:
@@ -55,6 +85,7 @@ private:
 	Huffman** data_; // array which has Huffman structures.
 };
 
+/// 해시
 class Hash
 {
 public:

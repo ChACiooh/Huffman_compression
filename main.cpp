@@ -1,58 +1,51 @@
 #include <iostream>
-#include <string>
 #include "DS.h"
 
 using namespace std;
 
-string input;
 bool flag = false;
 
-void InputInHash(Hash& myHash);
+/* declarations */
+void InputInHash(Hash& myHash, LinkedList& ll);
 void ConstructMinHeap(min_heap& myMinHeap, const Hash& myHash);
 void ConstructHuffmanTree(min_heap& myMinHeap);
-void InorderTraversalHuffman(Huffman* hf);
-void GetCode(string& output, Huffman *root, const char key);
-
-void Encode(Huffman *root)
-{
-	FILE *fp = fopen("output.txt", "w");
-	unsigned char buf = 0x0, temp = 0x0;
-	for (int i = 0; input[i] != '\0'; i++)
-	{
-		string output;
-		GetCode(output, root, input[i]);
-		flag = false;
-
-	}
-}
+void InorderTraversalHuffman(Huffman* hf); // 허프만 트리 탐색하는 함수. 디버깅용.
+void GetCode(const Huffman*, unsigned char&, const char, int& cnt);
+void Encode(LinkedList& ll, const Huffman* hf);
+void Decode(LinkedList& ll, const Huffman* hf);
 
 int main()
 {
+	/// 만들자 변수들!
     min_heap myMinHeap;
-    Huffman* temp_hf = NULL;
+    Huffman* complete_hf = NULL;
     Hash myHash;
-    Data *data_ptr;
+	LinkedList ll;
 
-    InputInHash(myHash);
-    ConstructMinHeap(myMinHeap, myHash);
-    ConstructHuffmanTree(myMinHeap);
-	temp_hf = myMinHeap.pop();
-
-	system("PAUSE");
+	/// 일하자 일!
+    InputInHash(myHash, ll); // 해시 테이블을 만들고, 완성된 문장을 ll에 저장.
+    ConstructMinHeap(myMinHeap, myHash); // 해시 테이블을 통해 우선순위 큐를 구축.
+    ConstructHuffmanTree(myMinHeap); // 구축된 큐를 통해 허프만 트리를 구축.
+	complete_hf = myMinHeap.pop(); // 완성된 허프만 트리를 얻어오는과정.
+	//InorderTraversalHuffman(complete_hf);
+	Encode(ll, complete_hf);
+	ll.~LinkedList();
+	Decode(ll, complete_hf);
 	
+	/// 마무리!
+	system("PAUSE");
     return 0;
 }
 
-
-void InputInHash(Hash& myHash)
+/* definitions */
+void InputInHash(Hash& myHash, LinkedList& ll)
 {
 	FILE *fp = fopen("input.txt", "rb");
-	unsigned char buf = 0;
+	char buf = 0;
 	while(!feof(fp) && (fscanf(fp, "%c", &buf)) != EOF && buf != 0xFF) {
 		myHash.PushLetter(buf);
-		input.push_back(buf);
+		ll.push_back(buf);
 	}
-	cout << input << " is read." << endl;
 	fclose(fp);
 }
 
@@ -100,32 +93,85 @@ void InorderTraversalHuffman(Huffman* hf)
 	InorderTraversalHuffman(hf->stemR);
 }
 
-void GetCode(string& output, Huffman *root, const char key)
+void GetCode(const Huffman* hf, unsigned char& base, const char check, int& cnt)
 {
-	// DFS 방식으로 탐색하면서 output에 저장해나간다
-	if (root->stemL == NULL && root->stemR == NULL)
+	unsigned char temp = 0x0;
+	if (hf == NULL)	return;
+	if (hf->stemL == NULL && hf->stemR == NULL && check == hf->datum.letter)
 	{
-		// leaf node렷다.
-		if (key == root->datum.letter) {
-			flag = true;
-		}
+		// leaf node이고 체크하고자 하는 글자와 같다.
+		flag = true;
 		return;
 	}
-	if (root->stemL)
+	else
 	{
-		output.push_back('0');
-		GetCode(output, root->stemL, key);
-		if (!flag) {
-			output.pop_back();
+		if (hf->stemL)
+		{
+			base = base << 1;
+			base = base | temp;
+			GetCode(hf->stemL, base, check, ++cnt);
+			if (!flag) { // 끝까지 가지 않았으면 원래대로 되돌리기
+				base = base >> 1;
+				cnt--;
+			}
+		}
+		if (flag)	return;
+		if (hf->stemR)
+		{
+			base = base << 1;
+			temp = 1;
+			base = base | temp;
+			GetCode(hf->stemR, base, check, ++cnt);
+			if (!flag){ // 끝까지 가지 않았으면 원래대로 되돌리기
+				base = base >> 1;
+				cnt--;
+			}
 		}
 	}
-	if (flag)	return;
-	if (root->stemR)
+}
+
+void Encode(LinkedList& ll, const Huffman* hf)
+{
+	unsigned char buf = 0x0;
+	int remained = sizeof(char) * 8;
+	FILE *fp = fopen("output.txt", "wb");
+	fprintf(fp, "%d\n", ll.size);
+	for (int i = 0; i < ll.size; i++)
 	{
-		output.push_back('1');
-		GetCode(output, root->stemR, key);
-		if (!flag){
-			output.pop_back();
+		char letter = ll[i];
+		unsigned char temp = 0x0;
+		int cnt = 0;
+		flag = false;
+		GetCode(hf, temp, letter, cnt); // hf를 기반으로 temp에 저장하며 letter로 비교하고 cnt는 깊이를 의미한다.
+		for (int j = 0; j < sizeof(char)*8 - cnt; j++)	temp = temp << j;
+		remained -= cnt;
+		if (remained == 0)
+		{
+			fprintf(fp, "%c", buf);
+			buf = 0x0;
+			remained = sizeof(char) * 8 - cnt;
 		}
+		else if (remained < 0) // shifting 처리를 별도로 해 주어야 한다.
+		{
+			buf = buf | (temp >> -remained);
+			fprintf(fp, "%c", buf);
+			buf = 0x0;
+			remained = sizeof(char) * 8 + remained;
+		}
+		buf = buf | temp;
+		buf = buf << remained;
 	}
+	if (buf)
+	{
+		// remained가 가진 값만큼 잉여 0이 있다.
+		fprintf(fp, "%c", buf);
+	}
+	fclose(fp);
+}
+
+void Decode(LinkedList& ll, const Huffman* hf)
+{
+	// ll에 결과를 저장한답니다 우왕~
+	unsigned char base = 0x0;
+
 }

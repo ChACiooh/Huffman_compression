@@ -1,6 +1,41 @@
 #include "DS.h"
 #include <iostream>
 
+/// 연결리스트
+void LinkedList::push_back(char letter)
+{
+	List **temp = &root;
+	if (!(*temp))
+	{
+		*temp = new List(letter);
+		size++;
+		return;
+	}
+	while ((*temp)->next)	(*temp) = (*temp)->next;
+	(*temp)->next = new List(letter);
+	size++;
+}
+
+LinkedList::~LinkedList()
+{
+	List *temp = root;
+	while (temp)
+	{
+		List *removed = temp;
+		temp = temp->next;
+		delete(removed);
+	}
+}
+
+char LinkedList::operator [](int idx)
+{
+	List *temp = root;
+	for (int i = 0; i < idx && temp->next; i++) {
+		temp = temp->next;
+	}
+	return temp->letter;
+}
+
 /// Hash
 void Hash::PushLetter(char letter)
 {
