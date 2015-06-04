@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#define SPEC_LETTERS	3 // ',', '.', ' '
+#define SPEC_LETTERS	4 // ',', '.', ' ', '#'
 #define HASH_SIZE	(26*2+SPEC_LETTERS)
 
 /// 연결리스트
@@ -22,14 +22,15 @@ struct List
 
 struct LinkedList
 {
-	LinkedList()
+	LinkedList() : size(0)
 	{
-		size = 0;
 		root = NULL;
 	}
 	~LinkedList();
 
 	void push_back(char);
+	List* pop_back();
+	List* pop_front();
 	char operator [](int idx);
 	int size;
 	List *root;

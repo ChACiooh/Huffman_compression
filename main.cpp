@@ -4,15 +4,16 @@
 using namespace std;
 
 bool flag = false;
+int original_byte, after_byte;
 
 /* declarations */
 void InputInHash(Hash& myHash, LinkedList& ll);
 void ConstructMinHeap(min_heap& myMinHeap, const Hash& myHash);
 void ConstructHuffmanTree(min_heap& myMinHeap);
 void InorderTraversalHuffman(Huffman* hf); // 허프만 트리 탐색하는 함수. 디버깅용.
-void GetCode(const Huffman*, unsigned char&, const char, int& cnt);
+void GetCode(LinkedList& outLL, const Huffman* hf, const char& key);
 void Encode(LinkedList& ll, const Huffman* hf);
-void Decode(LinkedList& ll, const Huffman* hf);
+void Decode(const Huffman* hf);
 
 int main()
 {
@@ -29,10 +30,10 @@ int main()
 	complete_hf = myMinHeap.pop(); // 완성된 허프만 트리를 얻어오는과정.
 	//InorderTraversalHuffman(complete_hf);
 	Encode(ll, complete_hf);
-	ll.~LinkedList();
-	Decode(ll, complete_hf);
+	printf("\n압축률 : %g\n", (double)after_byte / (double)original_byte * 100.0);
 	
 	/// 마무리!
+	Decode(complete_hf);
 	system("PAUSE");
     return 0;
 }
@@ -40,11 +41,30 @@ int main()
 /* definitions */
 void InputInHash(Hash& myHash, LinkedList& ll)
 {
+	// ll은 완성된 문장을 담는다.
 	FILE *fp = fopen("input.txt", "rb");
 	char buf = 0;
-	while(!feof(fp) && (fscanf(fp, "%c", &buf)) != EOF && buf != 0xFF) {
+	bool check = false;
+	while(!feof(fp) && fscanf(fp, "%c", &buf) != EOF)
+	{
+		if (buf == 0xFF)
+		{
+			// 파일의 끝부분
+			// 간혹 EOF를 읽는 경우를 위해 예외 처리를 해 줌.
+			myHash.PushLetter('#');
+			ll.push_back('#');
+			check = true;
+			break;
+		}
 		myHash.PushLetter(buf);
 		ll.push_back(buf);
+		original_byte++;
+	}
+	if (!check)
+	{
+		// 파일의 끝부분
+		myHash.PushLetter('#');
+		ll.push_back('#');
 	}
 	fclose(fp);
 }
@@ -64,6 +84,7 @@ void ConstructMinHeap(min_heap& myMinHeap, const Hash& myHash)
 
 void ConstructHuffmanTree(min_heap& myMinHeap)
 {
+	// Huffman Tree를 만드는 과정
 	Huffman *hf1 = NULL, *hf2 = NULL, *root = NULL;
 	do
 	{
@@ -93,38 +114,40 @@ void InorderTraversalHuffman(Huffman* hf)
 	InorderTraversalHuffman(hf->stemR);
 }
 
-void GetCode(const Huffman* hf, unsigned char& base, const char check, int& cnt)
+void GetCode(LinkedList& outLL, const Huffman* hf, const char& key)
 {
-	unsigned char temp = 0x0;
+	// 아무리 봐도 재귀가 너무 좋다.
+	// outLL에는 허프만 비트 코드를 남기도록 한다.
 	if (hf == NULL)	return;
-	if (hf->stemL == NULL && hf->stemR == NULL && check == hf->datum.letter)
+	if (hf->stemL == NULL && hf->stemR == NULL)
 	{
-		// leaf node이고 체크하고자 하는 글자와 같다.
-		flag = true;
-		return;
+		if (hf->datum.letter == key)
+		{
+			flag = true;
+			return;
+		}
 	}
 	else
 	{
-		if (hf->stemL)
+		if (hf->stemL) // 왼쪽은 0
 		{
-			base = base << 1;
-			base = base | temp;
-			GetCode(hf->stemL, base, check, ++cnt);
-			if (!flag) { // 끝까지 가지 않았으면 원래대로 되돌리기
-				base = base >> 1;
-				cnt--;
+			outLL.push_back('0');
+			GetCode(outLL, hf->stemL, key);
+			if (!flag)
+			{
+				List* temp = outLL.pop_back();
+				if (temp)	delete(temp);
 			}
 		}
 		if (flag)	return;
-		if (hf->stemR)
+		if (hf->stemR) // 오른쪽은 1
 		{
-			base = base << 1;
-			temp = 1;
-			base = base | temp;
-			GetCode(hf->stemR, base, check, ++cnt);
-			if (!flag){ // 끝까지 가지 않았으면 원래대로 되돌리기
-				base = base >> 1;
-				cnt--;
+			outLL.push_back('1');
+			GetCode(outLL, hf->stemR, key);
+			if (!flag)
+			{
+				List* temp = outLL.pop_back();
+				if (temp)	delete(temp);
 			}
 		}
 	}
@@ -132,46 +155,111 @@ void GetCode(const Huffman* hf, unsigned char& base, const char check, int& cnt)
 
 void Encode(LinkedList& ll, const Huffman* hf)
 {
-	unsigned char buf = 0x0;
-	int remained = sizeof(char) * 8;
+	List* ll_ptr = ll.root;
 	FILE *fp = fopen("output.txt", "wb");
-	fprintf(fp, "%d\n", ll.size);
-	for (int i = 0; i < ll.size; i++)
+	int bit_shift_remained = 8;
+	unsigned char buf = 0x0;
+
+	puts("Encoding...");
+	while (ll_ptr)
 	{
-		char letter = ll[i];
-		unsigned char temp = 0x0;
-		int cnt = 0;
+		LinkedList outLL; // 글자 하나마다 코드를 입력받기 위해 반복문 처음에 반복적으로 생성
 		flag = false;
-		GetCode(hf, temp, letter, cnt); // hf를 기반으로 temp에 저장하며 letter로 비교하고 cnt는 깊이를 의미한다.
-		for (int j = 0; j < sizeof(char)*8 - cnt; j++)	temp = temp << j;
-		remained -= cnt;
-		if (remained == 0)
+		GetCode(outLL, hf, ll_ptr->letter); // outLL에 코드가 저장됨
+		int now_size = outLL.size;
+		for (int i = 0; i < now_size; i++)
 		{
-			fprintf(fp, "%c", buf);
-			buf = 0x0;
-			remained = sizeof(char) * 8 - cnt;
+			List* temp_ptr = outLL.pop_front();
+			unsigned char base = temp_ptr->letter - '0';
+			//printf("%d", base);
+			delete(temp_ptr);
+			buf = buf << 1;
+			buf = buf | base;
+			bit_shift_remained--;
+			if (bit_shift_remained == 0)
+			{
+				bit_shift_remained = 8;
+				fprintf(fp, "%c", buf);
+				//printf("\n");
+				after_byte++;
+				buf = 0x0;
+			}
 		}
-		else if (remained < 0) // shifting 처리를 별도로 해 주어야 한다.
-		{
-			buf = buf | (temp >> -remained);
-			fprintf(fp, "%c", buf);
-			buf = 0x0;
-			remained = sizeof(char) * 8 + remained;
-		}
-		buf = buf | temp;
-		buf = buf << remained;
+		ll_ptr = ll_ptr->next;
 	}
-	if (buf)
+	if (bit_shift_remained != 8)
 	{
-		// remained가 가진 값만큼 잉여 0이 있다.
+		buf = buf << bit_shift_remained;
 		fprintf(fp, "%c", buf);
+		after_byte++;
 	}
+	puts(" Encoding end!");
 	fclose(fp);
 }
 
-void Decode(LinkedList& ll, const Huffman* hf)
+void Decode(const Huffman* hf)
 {
-	// ll에 결과를 저장한답니다 우왕~
-	unsigned char base = 0x0;
+	FILE *fp = fopen("output.txt", "rb");
+	FILE *ofp = fopen("recoveredinput.txt", "w"); // 원본으로 복구하기 위해 wb 대신 w를 사용.
+	char recoverd = 0x0;
+	unsigned char buf = 0x0;
+	int bit_shifting = 7;
+	LinkedList tempLL;
+	while (!feof(fp) && fscanf(fp, "%c", &buf) != EOF)
+	{
+		for (int i = 0; i <= bit_shifting; i++)
+		{
+			tempLL.push_back((buf & 0x80) >> bit_shifting);
+			buf = buf << 1;
+		}
+	}
+	fclose(fp);
 
+	List *list_ptr = tempLL.root;
+	const Huffman *const*pptr = &hf;
+	// 순회 한 번 해보자
+	/*int cnt = 8;
+	puts("Decoding...");
+	while (list_ptr)
+	{
+		printf("%d", list_ptr->letter);
+		cnt--;
+		if (cnt == 0)
+		{
+			cnt = 8;
+			puts("");
+		}
+		list_ptr = list_ptr->next;
+	}*/
+	
+	list_ptr = tempLL.root;
+
+	while (list_ptr)
+	{
+		if ((*pptr)->stemL == NULL && (*pptr)->stemR == NULL)
+		{
+			if ((*pptr)->datum.letter == '#')
+			{
+				cout << "종결 코드 읽음." << endl;
+				puts("Decoding end!");
+				cout << "프로그램 종료." << endl;
+				break;
+			}
+			fprintf(ofp, "%c", (*pptr)->datum.letter);
+			pptr = &hf;
+			continue; // 지금 코드는 다시 맨 위로 올라가서 확인해야 하므로 continue를 해야 한다.
+		}
+		else if (list_ptr->letter)
+		{
+			// 오른쪽
+			pptr = &((*pptr)->stemR);
+		}
+		else
+		{
+			// 왼쪽 
+			pptr = &((*pptr)->stemL);
+		}
+		list_ptr = list_ptr->next;
+	}
+	fclose(ofp);
 }

@@ -4,16 +4,38 @@
 /// 연결리스트
 void LinkedList::push_back(char letter)
 {
-	List **temp = &root;
+	List **temp = &root; // 포인터들이 모두 연관되어 있으므로, 더블 포인터를 사용하여야 함.
 	if (!(*temp))
 	{
 		*temp = new List(letter);
-		size++;
+		this->size++;
 		return;
 	}
-	while ((*temp)->next)	(*temp) = (*temp)->next;
+	while ((*temp)->next)	temp = &((*temp)->next);
 	(*temp)->next = new List(letter);
-	size++;
+	this->size++;
+}
+
+List* LinkedList::pop_back()
+{
+	List **temp = &root; // 포인터들이 모두 연관되어 있으므로, 더블 포인터를 사용하여야 함.
+	if (!(*temp))	return NULL;
+	while ((*temp)->next)	temp = &(*temp)->next;
+	List *return_val = new List((*temp)->letter);
+	delete(*temp);
+	*temp = NULL;
+	temp = NULL;
+	this->size--;
+	return return_val;
+}
+
+List* LinkedList::pop_front()
+{
+	if (!root)	return NULL;
+	List* return_val = root;
+	root = root->next;
+	this->size--;
+	return return_val;
 }
 
 LinkedList::~LinkedList()
@@ -44,9 +66,10 @@ void Hash::PushLetter(char letter)
 	else if('a' <= letter && letter <= 'z')	idx = gap + (letter - 'a');
 	else
 	{
-		if(letter == ' ')	idx = gap*2;
-		else if(letter == ',')	idx = gap*2 + 1;
-		else if(letter == '.')	idx = gap*2 + 2;
+		if (letter == ' ')	idx = gap * 2;
+		else if (letter == ',')	idx = gap * 2 + 1;
+		else if (letter == '.')	idx = gap * 2 + 2;
+		else if (letter == '#')	idx = gap * 2 + 3; // 종결 코드
 		else{
 			fprintf(stderr, "unexpected charactor.\n");
 			return;
@@ -69,15 +92,17 @@ Data* Hash::GetData(int idx) const
 	}
 	else switch(idx)
 	{
-	case 52:
+	case gap*2:
 		letter = ' ';
 		break;
-	case 53:
+	case gap*2+1:
 		letter = ',';
 		break;
-	case 54:
+	case gap*2+2:
 		letter = '.';
 		break;
+	case gap*2+3:
+		letter = '#';
 	}
 
 	return new Data(letter, data_[idx]);
@@ -170,6 +195,7 @@ Huffman* min_heap::pop()
 	data_[size_--] = NULL;
 	int parent = 1, child = 2;
 
+	// shift down
 	while (child <= size_)
 	{
 		if (child < size_ && data_[child]->num > data_[child + 1]->num)	++child;
